@@ -1,1 +1,232 @@
-<p>EMPTY</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asymmetric Optimization of Reasoning and Perception in VLM Post-Training</title>
+<meta name="description" content="A controlled study showing that VLM post-training (SFT and RL) improves reasoning much more than perception, identifying token imbalance and reward coupling as the causes, and proposing targeted interventions.">
+<link rel="icon" type="image/png" href="static/favicon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="container">
+    <h1 class="title">On Asymmetric Optimization of Reasoning and Perception in Vision-Language Model Post-Training</h1>
+
+    <div class="authors">
+      <span class="author">Xueqing Wu</span>
+      <span class="author">Yu-Chi Lin</span>
+      <span class="author">Kai-Wei Chang</span>
+      <span class="author">Nanyun Peng</span>
+    </div>
+    <div class="affiliation">University of California, Los Angeles</div>
+
+    <div class="links">
+      <a class="btn" href="https://arxiv.org/pdf/2605.29496" aria-label="Paper">
+        <span class="btn-icon">📄</span><span>Paper</span>
+      </a>
+      <a class="btn" href="https://arxiv.org/abs/2605.29496" aria-label="arXiv">
+        <span class="btn-icon">📚</span><span>arXiv</span>
+      </a>
+      <a class="btn" href="https://github.com/PlusLabNLP/asymmetric-VLM" aria-label="Code">
+        <span class="btn-icon">💻</span><span>Code</span>
+      </a>
+      <a class="btn" href="#bibtex" aria-label="BibTeX">
+        <span class="btn-icon">📑</span><span>BibTeX</span>
+      </a>
+    </div>
+
+    <div class="tldr">
+      <strong>TL;DR.</strong> VLM post-training (both SFT and RL) improves <span class="r">reasoning</span> much more than <span class="p">perception</span>, leaving perception as the bottleneck for end-to-end visual reasoning. We trace this asymmetry to two distinct mechanisms — <strong>token imbalance</strong> in SFT and <strong>reward coupling</strong> in RL — and show that targeted interventions yield up to <strong>+18.2</strong> end-to-end accuracy.
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="section teaser-section">
+  <div class="container">
+    <figure class="teaser">
+      <img src="static/images/teaser_myself.png" alt="Teaser figure: asymmetric optimization in SFT and RL">
+      <figcaption>
+        <strong>Asymmetric optimization of perception and reasoning.</strong> Both SFT (left) and RL (right) improve reasoning (<span class="r">R</span>) substantially more than perception (<span class="p">P</span>), but for different reasons — and each admits a different mitigation.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container narrow">
+    <h2>Abstract</h2>
+    <p>
+      Post-training has greatly improved reasoning in frontier vision-language models, yet its gains for perception remain comparatively limited, creating a bottleneck for end-to-end visual reasoning. To investigate this gap, we introduce a <em>controlled diagnostic framework</em> with two synthetic tasks that disentangle perception from reasoning. Our analysis reveals a consistent <strong>perception-reasoning asymmetry</strong>: post-training improves reasoning more substantially than perception, though the underlying mechanism differs by training paradigm.
+    </p>
+    <p>
+      For supervised fine-tuning (SFT), this asymmetry stems from <strong>token imbalance</strong> in chain-of-thought supervision, where perception occupies fewer tokens and thus receives a weaker training signal. Dynamically reweighting the loss mitigates this imbalance and boosts end-to-end performance by up to <strong>18.2</strong>. For reinforcement learning (RL), the asymmetry instead arises from <strong>reward coupling</strong>: outcome rewards correlate more strongly with reasoning than with perception, weakening the signal for perception learning. Adding a perception-aware reward alleviates the imbalance and improves end-to-end accuracy by up to <strong>6.0</strong>; even without ground-truth perception rewards, a reliable surrogate reward provides useful signal, yielding gains of <strong>3.2</strong> points.
+    </p>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <h2>Key Findings</h2>
+    <div class="cards cards-1-2">
+      <div class="card card-wide">
+        <div class="card-num">1</div>
+        <h3>A consistent asymmetry across SFT and RL</h3>
+        <p>Across two model families (Qwen3-VL, InternVL3.5) and two tasks (Graph Coloring, Sudoku), both SFT and RL improve <span class="r">reasoning</span> far more than <span class="p">perception</span>, leaving perception as the dominant bottleneck for end-to-end visual reasoning.</p>
+        <div class="card-figs">
+          <figure>
+            <img src="static/images/sft_gap_small.png" alt="SFT training curves: reasoning rises sharply while perception stays flat">
+            <figcaption>SFT: reasoning lifts dramatically; perception barely moves.</figcaption>
+          </figure>
+          <figure>
+            <img src="static/images/rl_gap_small.png" alt="RL training curves: reasoning rises faster than perception">
+            <figcaption>RL: same pattern — reasoning outpaces perception.</figcaption>
+          </figure>
+        </div>
+        <p class="card-closing">The two paradigms share a symptom but, as we show below, arise from <em>different</em> mechanisms — and require <em>different</em> mitigations.</p>
+      </div>
+      <div class="card">
+        <div class="card-num">2</div>
+        <h3>SFT: token imbalance &rarr; loss reweighting</h3>
+        <p><strong>Mechanism.</strong> In CoT supervision, perception occupies only ~2.5% of tokens and contributes just ~1.3% of the loss — token-averaged cross-entropy implicitly starves perception of gradient.</p>
+        <p class="card-mitigation"><strong>Mitigation.</strong> Reweight the loss to upweight perception tokens. A fixed weight already helps; dynamic multi-task balancing (NGDiff) lifts end-to-end accuracy by up to <strong>+18.2</strong>.</p>
+      </div>
+      <div class="card">
+        <div class="card-num">3</div>
+        <h3>RL: reward coupling &rarr; perception-aware reward</h3>
+        <p><strong>Mechanism.</strong> The outcome reward correlates strongly with reasoning (r = 0.65–1.00) but only weakly with perception (r = 0.34–0.43), so perception receives a noisy credit signal.</p>
+        <p class="card-mitigation"><strong>Mitigation.</strong> Add a perception term to the reward. Ground-truth perception rewards give up to <strong>+6.0</strong>; a well-chosen surrogate reward still yields <strong>+3.2</strong> without any perception labels.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>A Controlled Diagnostic Framework</h2>
+    <p class="lead">
+      Real visual reasoning benchmarks rarely admit a clean separation of perception from reasoning. We build a synthetic testbed where the visual input has a <em>canonical textual representation</em> <code>p*</code>, enabling three orthogonal metrics:
+    </p>
+    <ul class="metric-list">
+      <li><strong>End-to-end accuracy</strong> — does the model solve the task from the image?</li>
+      <li><strong>Perception accuracy</strong> — does the model recover <code>p*</code> from the image?</li>
+      <li><strong>Counterfactual reasoning accuracy</strong> — given oracle perception <code>p*</code>, can the model reason correctly?</li>
+    </ul>
+
+    <figure>
+      <img src="static/images/task_illustration.png" alt="Graph coloring and Sudoku task illustration">
+      <figcaption>
+        <strong>Two synthetic tasks.</strong> <em>Graph Coloring</em> requires coloring all nodes with the chromatic number while assigning different colors to adjacent nodes; <code>p*</code> is the edge list. <em>Sudoku</em> requires completing the 9×9 grid; <code>p*</code> is the partially-filled grid. Outputs are structured as perception followed by reasoning.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <h2>SFT: Token Imbalance Drives the Asymmetry</h2>
+    <p class="lead">
+      In CoT supervision, perception is a compact transcription while reasoning sprawls across verification, reflection, and self-correction. Token-averaged cross-entropy implicitly weights each part by its token count — so perception is starved of gradient.
+    </p>
+
+    <div class="two-col">
+      <figure>
+        <img src="static/images/sft_gap_bar.png" alt="SFT perception vs reasoning gap">
+        <figcaption>Reasoning improves dramatically; perception barely moves.</figcaption>
+      </figure>
+      <figure>
+        <img src="static/images/sft_tradeoff_small.png" alt="Perception-reasoning trade-off in SFT">
+        <figcaption>Upweighting perception exposes a clean trade-off — and end-to-end accuracy peaks when perception is <em>modestly</em> upweighted.</figcaption>
+      </figure>
+    </div>
+
+    <div class="takeaway">
+      <div class="takeaway-title">Intervention: Loss Reweighting</div>
+      <p>
+        Replace the standard token-averaged loss with
+        <code>L = λ · L<sub>p</sub> + (1−λ) · L<sub>r</sub></code>,
+        where <code>L<sub>p</sub></code> and <code>L<sub>r</sub></code> are the token-averaged losses over the perception and reasoning spans, respectively.
+      </p>
+      <p>
+        A fixed reweighting already gives up to <strong>+13.8</strong> points; dynamic balancing with NGDiff — which adjusts <code>λ</code> on the fly to equalize perception and reasoning gradients — gives up to <strong>+18.2</strong>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>RL: Reward Coupling Drives the Asymmetry</h2>
+    <p class="lead">
+      Under GRPO with an outcome reward, perception only influences the reward when the downstream reasoning also happens to be correct. The result is a credit-assignment problem: the reward signal is well-aligned with reasoning, but only loosely aligned with perception.
+    </p>
+
+    <div class="two-col">
+      <figure>
+        <img src="static/images/rl_gap_bar.png" alt="RL perception vs reasoning gap">
+        <figcaption>Reasoning gains consistently outpace perception gains across settings.</figcaption>
+      </figure>
+      <figure>
+        <img src="static/images/rl_tradeoff_small.png" alt="Perception-reasoning trade-off frontier in RL">
+        <figcaption>Adding a perception reward exposes a clean trade-off frontier — end-to-end accuracy peaks at a non-zero perception-reward weight.</figcaption>
+      </figure>
+    </div>
+
+    <div class="takeaway">
+      <div class="takeaway-title">Intervention: Perception-Aware Reward</div>
+      <p>
+        Optimize against <code>R = α · a<sub>p</sub> + (1−α) · a</code>,
+        where <code>a<sub>p</sub></code> is perception accuracy and <code>a</code> is end-to-end accuracy.
+      </p>
+      <p>
+        Ground-truth perception rewards yield up to <strong>+6.0</strong> end-to-end accuracy. When ground-truth perception isn't available, <em>surrogate rewards</em> still help — and reward–perception correlation is a reliable diagnostic for which surrogate will work, yielding up to <strong>+3.2</strong>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container narrow">
+    <h2>Takeaways for VLM Post-Training</h2>
+    <ul class="takeaway-list">
+      <li><strong>Don't trust end-to-end accuracy alone.</strong> A model can post-train into much better reasoning without its perception meaningfully improving — and perception is what bottlenecks the next round of gains.</li>
+      <li><strong>The default objectives are biased.</strong> Token-averaged SFT and outcome-reward RL each have a built-in preference for reasoning over perception.</li>
+      <li><strong>The fix is paradigm-specific.</strong> SFT needs loss reweighting; RL needs perception-aware (or perception-correlated surrogate) rewards. Both are simple drop-in changes.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="bibtex">
+  <div class="container narrow">
+    <h2>BibTeX</h2>
+    <pre class="bibtex"><code>@misc{wu2026asymmetricoptimizationreasoningperception,
+      title={On Asymmetric Optimization of Reasoning and Perception in Vision-Language Model Post-Training}, 
+      author={Xueqing Wu and Yu-Chi Lin and Kai-Wei Chang and Nanyun Peng},
+      year={2026},
+      eprint={2605.29496},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2605.29496}, 
+}</code></pre>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="container">
+    <p>University of California, Los Angeles</p>
+    <p class="muted">Page template adapted from common academic project pages.</p>
+  </div>
+</footer>
+
+</body>
+</html>
